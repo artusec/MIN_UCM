@@ -11,7 +11,7 @@ rm(list=ls())
 source("model/clustering/cargaNormalizada.r")
 
 # Esta función esta en cargaFinalClustering.r
-data <- loadTraining(100)
+data <- loadTraining(78)
 
 temperature<-data$temperatures;
 raining<-data$raining;
@@ -26,7 +26,19 @@ temperatureRain <- matrix(c(temperature,raining),ncol=2); #Una columna para las 
 # Clustering jerárquico para ver cuantos grupos tiene sentido hacer
 plot(hclust(dist(temperatureRain)))
 
-result <- kmeans(temperatureRain,4)
+index <- match("Panama",names);
+centers<-matrix(c(temperature[[index]],raining[[index]]),ncol=2);
+
+index <- match("Saudi Arabia",names);
+centers<-rbind(centers,c(temperature[[index]],raining[[index]]));
+
+index <- match("Italy",names);
+centers<-rbind(centers,c(temperature[[index]],raining[[index]]));
+
+index <- match("Canada",names);
+centers<-rbind(centers,c(temperature[[index]],raining[[index]]));
+
+result <- kmeans(temperatureRain,centers)
 
 # Para dibujar
 plot(temperatureRain,col=result$cluster)
@@ -65,3 +77,45 @@ for(i in 1:(length(temperature))){
 
 clustered <- data.frame(names=names,climate=climates)
 View(clustered)
+
+
+#Analizo Francia ano por ano por ejemplo
+source("cargarDatasets.r")
+country <- normalizarANormal(na.omit(datasets))[[1]][["france"]]
+
+climates <- vector();
+p <- vector();
+rains <-vector();
+temperatures <-vector();
+distances <-vector();
+
+for(year in country$Year){
+  
+  rainTmp <- vector();
+  for(month in (grep("[A-Za-z]*Rain",colnames(country), perl=TRUE, value=TRUE)))
+    rainTmp <- c(rainTmp,subset(country,Year==year)[[month]]);
+  
+  raining <- mean(rainTmp);
+  
+  temperatureTmp <- vector();
+  for(month in (grep("[A-Za-z]*Temperature",colnames(country), perl=TRUE, value=TRUE)[1:12]))
+    temperatureTmp <- c(temperatureTmp,subset(country,Year==year)[[month]]);
+  
+  temperature <- mean(temperatureTmp);
+  
+  climates <- c(climates,climateNames[predictClimate(temperature,raining)]);
+  
+  #Mido la distancia de Francia al clima seco.
+  distances <-c(distances,dist(rbind(c(temperature,raining),result$centers[which(climateNames=="seco"),]),method="euclidean")[[1]]);
+  rains <- c(rains,raining);
+  temperatures<-c(temperatures,temperature);
+}
+
+plot(matrix(c(country$Year,temperatures),ncol = 2),type="l",col="red",lwd=3);
+lines(matrix(c(country$Year,rains),ncol = 2),type="l",col="blue",lwd=3);
+
+#dibujo la distancia al clima seco durante los anos
+plot(matrix(c(country$Year,distances),ncol = 2),type="l",col="orange",lwd=3);
+
+countryResult <- data.frame(year=country$Year,climates=climates,distanciaSeco=distances)
+View(countryResult)
